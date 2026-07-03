@@ -4,17 +4,17 @@ import { guessLocationName } from '../ocrParse.js'
 describe('guessLocationName', () => {
   const imageHeight = 1920 // top region = 1920 * 0.2 = 384
 
-  it('picks the longest line within the top region of the image', () => {
+  it('picks the highest content-score line within the top region of the image', () => {
     const lines = [
       { text: '風景變電箱', bbox: { y0: 60, y1: 120 } }, // top region
-      { text: '13:40', bbox: { y0: 10, y1: 40 } }, // top region, but numeric -> excluded
+      { text: '13:40', bbox: { y0: 10, y1: 40 } }, // top region, but clock text -> excluded
       { text: '小 紫色蘑菇', bbox: { y0: 1000, y1: 1050 } }, // below top region -> excluded
     ]
 
     expect(guessLocationName(lines, imageHeight)).toBe('風景變電箱')
   })
 
-  it('excludes purely numeric/symbol lines', () => {
+  it('excludes purely numeric/symbol lines (no CJK or Latin word content)', () => {
     const lines = [{ text: '59,140', bbox: { y0: 100, y1: 160 } }]
     expect(guessLocationName(lines, imageHeight)).toBe('')
   })
@@ -26,7 +26,7 @@ describe('guessLocationName', () => {
 
   // 迴歸測試:實測時發現遊戲截圖左下角的倒數 pill(疊在草地背景上)常被 Tesseract
   // 誤判成一長串英數字亂碼,且該 pill 垂直位置恰好落在畫面 1/3 附近,曾經蓋過真正的
-  // 地標名稱被選中。改用更小的上方區間(20%)+ 長度上限後,亂碼應該被排除在外。
+  // 地標名稱被選中。改用更小的上方區間(20%)後,亂碼應該被排除在外。
   it('prefers the real landmark name over long OCR noise near the old 1/3 boundary', () => {
     const lines = [
       { text: '風景變電箱', bbox: { y0: 217, y1: 262 } }, // ~11-14% of height, real landmark
@@ -51,6 +51,25 @@ describe('guessLocationName', () => {
   it('excludes phone status bar clock text (e.g. "13:40")', () => {
     const lines = [{ text: '13:40 7 Mr =', bbox: { y0: 59, y1: 98 } }]
     expect(guessLocationName(lines, imageHeight)).toBe('')
+  })
+
+  // 迴歸測試:實測「輕軌竿蓁林站 LRT Ganzhenlin Station」這張截圖時發現,中文部分被誤讀成
+  // 亂碼、但英文站名幾乎完整正確的那一行,反而輸給了另一行只是把某處誤讀成重複中文數字
+  // 「一」的短亂碼 —— 因為舊邏輯只看「中文字數」,兩個字的「一一」贏過零個中文字的英文站名。
+  // 改用「中文字元*3 + 連續英文單字長度」的內容分數,且拿掉長度上限(合法的雙語地標名稱
+  // 可能很長),應該要讓資訊量明顯更高的那一行勝出。
+  it('prefers a mostly-correct bilingual line over short noise with a repeated CJK numeral', () => {
+    const lines = [
+      {
+        text: '_  &E#,%3HIE LRT GanzhenliniStation > hm',
+        bbox: { y0: 189, y1: 302 },
+      },
+      { text: '一 一 . 1 8', bbox: { y0: 431, y1: 505 } },
+    ]
+
+    expect(guessLocationName(lines, imageHeight)).toBe(
+      '_  &E#,%3HIE LRT GanzhenliniStation > hm',
+    )
   })
 
   it('returns empty string when no lines or no image height', () => {
