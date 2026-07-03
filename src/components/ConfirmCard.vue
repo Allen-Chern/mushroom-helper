@@ -14,9 +14,31 @@ const locationName = ref(props.guess.locationName)
 const hours = ref(props.guess.hours)
 const minutes = ref(props.guess.minutes)
 const seconds = ref(props.guess.seconds)
-const photoTimeMs = ref(props.guess.photoTimeMs)
 const photoTimeSource = ref(props.guess.photoTimeSource)
 const updateMode = ref('update')
+
+// 照片時間的「分鐘以上」部分交給原生 datetime-local 元件(iOS 對這塊支援沒問題),
+// 「秒」則獨立用數字輸入框處理 —— 實測發現 iOS Safari 的 datetime-local 選擇器
+// 介面本身就沒有秒數欄位,靠它顯示/編輯秒數不可靠,乾脆完全不依賴它處理秒
+function toLocalMinuteInputValue(ms) {
+  const d = new Date(ms)
+  const pad = (n) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const photoDateTimeMinutePart = ref(toLocalMinuteInputValue(props.guess.photoTimeMs))
+const photoSeconds = ref(new Date(props.guess.photoTimeMs).getSeconds())
+
+const photoTimeMs = computed(() => {
+  const base = new Date(photoDateTimeMinutePart.value)
+  if (Number.isNaN(base.getTime())) return props.guess.photoTimeMs
+  base.setSeconds(Number(photoSeconds.value) || 0)
+  return base.getTime()
+})
+
+function markPhotoTimeAsManual() {
+  photoTimeSource.value = 'manual'
+}
 
 const timeSourceLabel = computed(() => {
   return { exif: '照片 EXIF(自動)', lastModified: '檔案時間(自動)', manual: '需手動輸入' }[
@@ -42,23 +64,6 @@ const duplicateMatch = computed(() => {
 const isRespawnTimeSuspicious = computed(() => respawnAt.value < Date.now() - 60 * 60 * 1000)
 
 const isValid = computed(() => locationName.value.trim().length > 0)
-
-function toLocalInputValue(ms) {
-  const d = new Date(ms)
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-}
-
-const photoTimeInputValue = computed({
-  get: () => toLocalInputValue(photoTimeMs.value),
-  set: (value) => {
-    const ms = new Date(value).getTime()
-    if (!Number.isNaN(ms)) {
-      photoTimeMs.value = ms
-      photoTimeSource.value = 'manual'
-    }
-  },
-})
 
 function handleSubmit() {
   if (!isValid.value) return
@@ -87,10 +92,15 @@ function handleSubmit() {
       <label>秒 <input v-model.number="seconds" type="number" min="0" max="59" /></label>
     </fieldset>
 
-    <label>
-      照片時間({{ timeSourceLabel }})
-      <input v-model="photoTimeInputValue" type="datetime-local" step="1" />
-    </label>
+    <fieldset class="photo-time-fields">
+      <legend>照片時間({{ timeSourceLabel }})</legend>
+      <input
+        v-model="photoDateTimeMinutePart"
+        type="datetime-local"
+        @change="markPhotoTimeAsManual"
+      />
+      <label>秒 <input v-model.number="photoSeconds" type="number" min="0" max="59" @change="markPhotoTimeAsManual" /></label>
+    </fieldset>
 
     <p v-if="isRespawnTimeSuspicious" class="warning">
       ⚠️ 算出的重生時間比現在早超過 1 小時,請確認時間是否正確。
@@ -158,6 +168,26 @@ input[type='datetime-local'] {
 }
 
 .duration-fields input {
+  width: 60px;
+  padding: 6px;
+}
+
+.photo-time-fields {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.photo-time-fields label {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.photo-time-fields input[type='number'] {
   width: 60px;
   padding: 6px;
 }
