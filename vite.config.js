@@ -8,6 +8,12 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
+      // skipWaiting + clientsClaim:讓新版 service worker 立刻接管,避免使用者卡在部署前的
+      // 舊版快取(實測發現:EXIF 修好後部署上線,舊分頁/PWA 卻仍讀到修好前的舊版 JS bundle)
+      workbox: {
+        skipWaiting: true,
+        clientsClaim: true,
+      },
       // 只快取 app shell,離線時可瀏覽已載入過的頁面;不做背景推播(對應設計文件 §4.1)
       manifest: {
         name: '蘑菇重生計時器',
