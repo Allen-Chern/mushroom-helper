@@ -16,11 +16,39 @@ function buildFakeExifJpeg() {
   bytes.set([0x45, 0x78, 0x69, 0x66, 0x00, 0x00], 6)
 
   const tiffStart = 12
+  writeMinimalTiff(view, tiffStart, '2024:01:15 13:40:05')
+
+  return bytes.buffer
+}
+
+// 手動組出一個最小的 PNG + eXIf chunk(PNG spec 2017 年後支援的原生 EXIF chunk)。
+// 實測發現 iOS 截圖透過分享/上傳匯出的 PNG 常帶有這個 chunk,且時間精準到秒 —— 這是
+// 「照片時間沒有到秒」問題的根本原因:原本的解析器只認 JPEG 開頭,PNG 直接跳過。
+function buildFakePngWithExif(dateStr) {
+  const tiffLength = 64
+  const bytes = new Uint8Array(8 + 4 + 4 + tiffLength + 4)
+  const view = new DataView(bytes.buffer)
+
+  // PNG signature
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0)
+
+  // eXIf chunk: length(4, BE) + type(4) + data(tiffLength) + CRC(4, dummy, not validated)
+  view.setUint32(8, tiffLength)
+  bytes.set([0x65, 0x58, 0x49, 0x66], 12) // "eXIf"
+
+  const tiffStart = 16
+  writeMinimalTiff(view, tiffStart, dateStr)
+
+  return bytes.buffer
+}
+
+// 寫入最小 TIFF/EXIF 結構:IFD0 -> ExifIFD -> DateTimeOriginal(tag 0x9003) = dateStr
+function writeMinimalTiff(view, tiffStart, dateStr) {
   view.setUint16(tiffStart, 0x4949, true) // 'II' little-endian
   view.setUint16(tiffStart + 2, 0x002a, true) // TIFF magic
   view.setUint32(tiffStart + 4, 8, true) // IFD0 offset = 8 (relative to tiffStart)
 
-  // IFD0 at tiffStart+8 = 20
+  // IFD0 at tiffStart+8
   const ifd0 = tiffStart + 8
   view.setUint16(ifd0, 1, true) // 1 entry
   const ifd0Entry = ifd0 + 2
@@ -30,7 +58,7 @@ function buildFakeExifJpeg() {
   view.setUint32(ifd0Entry + 8, 26, true) // value: ExifIFD offset (relative to tiffStart)
   view.setUint32(ifd0Entry + 12, 0, true) // next IFD offset = 0
 
-  // Exif SubIFD at tiffStart+26 = 38
+  // Exif SubIFD at tiffStart+26
   const exifIfd = tiffStart + 26
   view.setUint16(exifIfd, 1, true) // 1 entry
   const exifEntry = exifIfd + 2
@@ -40,14 +68,12 @@ function buildFakeExifJpeg() {
   view.setUint32(exifEntry + 8, 44, true) // value: offset to ASCII data (relative to tiffStart)
   view.setUint32(exifEntry + 12, 0, true) // next IFD offset = 0
 
-  // ASCII data at tiffStart+44 = 56
+  // ASCII data at tiffStart+44
   const asciiOffset = tiffStart + 44
-  const dateStr = '2024:01:15 13:40:05\0'
-  for (let i = 0; i < dateStr.length; i++) {
-    bytes[asciiOffset + i] = dateStr.charCodeAt(i)
+  const fullDateStr = `${dateStr}\0`
+  for (let i = 0; i < fullDateStr.length; i++) {
+    view.setUint8(asciiOffset + i, fullDateStr.charCodeAt(i))
   }
-
-  return bytes.buffer
 }
 
 describe('readExifDateTimeFromBuffer', () => {
@@ -57,7 +83,13 @@ describe('readExifDateTimeFromBuffer', () => {
     expect(result).toBe(new Date(2024, 0, 15, 13, 40, 5).getTime())
   })
 
-  it('returns null for a non-JPEG buffer (e.g. PNG screenshot)', () => {
+  it('parses DateTimeOriginal from a minimal hand-built PNG eXIf chunk', () => {
+    const buffer = buildFakePngWithExif('2026:07:03 14:55:42')
+    const result = readExifDateTimeFromBuffer(buffer)
+    expect(result).toBe(new Date(2026, 6, 3, 14, 55, 42).getTime())
+  })
+
+  it('returns null for a PNG without an eXIf chunk', () => {
     const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
     expect(readExifDateTimeFromBuffer(png.buffer)).toBeNull()
   })
