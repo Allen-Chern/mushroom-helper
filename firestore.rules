@@ -1,0 +1,15 @@
+rules_version = '2';
+
+// 完全匿名協作:知道 setId 就等於擁有存取權(對應設計文件 §4.2 安全性提醒)
+// 刻意不開放 /observationSets 的 list 權限,避免有人列舉出所有觀察集 ID
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /observationSets/{setId} {
+      allow get, create, update, delete: if true;
+
+      match /items/{itemId} {
+        allow read, write: if true;
+      }
+    }
+  }
+}

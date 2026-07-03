@@ -1,0 +1,68 @@
+:root {
+  --text: #3a3a3a;
+  --text-h: #1a1a1a;
+  --bg: #fdfaf3;
+  --card-bg: #ffffff;
+  --border: #e5e0d5;
+  --accent: #8a4fd6;
+  --accent-bg: rgba(138, 79, 214, 0.1);
+  --danger: #c0392b;
+  --muted: #8a8a8a;
+
+  font: 16px/145% system-ui, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light dark;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #cfcfcf;
+    --text-h: #f3f4f6;
+    --bg: #17161c;
+    --card-bg: #201f27;
+    --border: #34323d;
+    --accent: #b98af0;
+    --accent-bg: rgba(185, 138, 240, 0.15);
+    --danger: #e57368;
+    --muted: #8f8d99;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 600;
+  color: var(--text-h);
+  margin: 0 0 12px;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+input,
+button {
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+#app {
+  max-width: 640px;
+  margin: 0 auto;
+  min-height: 100svh;
+  padding: 16px;
+}
