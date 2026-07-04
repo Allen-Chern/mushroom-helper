@@ -155,7 +155,7 @@ function handleReset() {
 
     <p v-if="isActive" class="progress">處理中:第 {{ currentIndex + 1 }} / {{ queue.length }} 張</p>
 
-    <p v-if="isProcessing" class="hint">🔍 OCR 辨識中,第一次使用需要下載中文語言包,請稍候...</p>
+    <p v-if="isProcessing" class="hint">🔍 OCR 辨識中,請稍候...</p>
     <p v-if="ocrError" class="hint warning">{{ ocrError }}</p>
     <p v-if="saveError" class="hint warning">{{ saveError }}</p>
 
