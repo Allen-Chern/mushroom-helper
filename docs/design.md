@@ -11,11 +11,11 @@
 
 ## 2. 假設
 
-1. 後端方案採 Firebase(BaaS),免費額度足夠這個規模,不需自建/維運伺服器
+1. 後端方案採 Firebase(BaaS),免費額度足夠這個規模,不需自建/維運伺服器(2026-07-04 更新:因加入 Cloud Functions 呼叫 Vision API,專案需升級為 Blaze 用量付費方案,但 Functions/Vision API 的免費額度仍遠超這個規模的實際用量,預期不會真的產生費用,已設 $5 預算告警當保險)
 2. 倒數時間文字解析需涵蓋「N小時N分N秒」「N分N秒」「N秒」等缺省組合
 3. 通知使用瀏覽器 Notification API + 音效,需使用者授權通知權限;拒絕的話僅在分頁前景時響鈴;不支援 Notification API 的瀏覽器自動降級為僅音效
 4. 不需要任何圖片儲存服務,照片確認後即從記憶體捨棄,從未上傳雲端
-5. 地標名稱的 OCR 自動猜測準確度偏低,預期使用者經常需要手動修正
+5. 地標名稱的 OCR 自動猜測準確度偏低,預期使用者經常需要手動修正(2026-07-04 更新:換用 Cloud Vision API 後實測準確度大幅提升,但決策 #6 的強制人工確認流程不變,仍保留作為品質把關)
 
 ## 3. Decision Log
 
@@ -25,7 +25,7 @@
 | 2 | 平台:手機與電腦同等支援(RWD) | 純手機優先、純電腦優先 | 使用者需求明確表示兩者都要 |
 | 3 | 通知只需分頁開著(前景/背景)即觸發 | 支援 App 完全關閉時推播(Web Push) | 大幅降低技術難度,不需要 Service Worker + 後端觸發機制 |
 | 4 | 資料後端採 BaaS(Firebase Firestore) | 自建輕量後端、完全無後端(URL 編碼全部狀態) | 「多人即時共編」本質需要共用資料存放處,BaaS 可避免自己寫維護伺服器,同時保留免後端程式碼的體驗 |
-| 5 | OCR 純前端執行(Tesseract.js) | 雲端 OCR API(如 Google Cloud Vision) | 使用者傾向完全不依賴 API 金鑰/網路服務,接受較低準確度並以人工確認彌補 |
+| 5 | ~~OCR 純前端執行(Tesseract.js)~~(已於 2026-07-04 由決策 #21 取代,見下) | 雲端 OCR API(如 Google Cloud Vision) | 使用者傾向完全不依賴 API 金鑰/網路服務,接受較低準確度並以人工確認彌補 |
 | 6 | 每張照片 OCR 結果都需人工確認/修正後才儲存 | 直接信任 OCR 自動儲存 | 純前端 OCR 準確度有限,人工確認是必要的品質把關 |
 | 7 | 原始照片確認後即丟棄,不儲存 | 保留照片作參考/彙報 | 簡化架構,不需要圖片儲存服務與相關費用 |
 | 8 | 通知設定屬於裝置/瀏覽器(localStorage) | 屬於個人帳號,跨裝置同步 | 避免需要建立帳號系統,符合「完全無登入」的協作模型 |
@@ -41,6 +41,8 @@
 | 18 | 地標名稱 OCR 嘗試自動猜測(畫面上方 1/3 區域最長文字),但預期經常需人工修正 | 完全不自動猜,永遠留白手動輸入 | 在自動化嘗試與準確度風險之間取得平衡,搭配強制人工確認流程降低風險 |
 | 19 | 時間精準度採用 `file.lastModified` 的毫秒精度即可,無需微秒 | 追求更高精度的時間來源 | 瓶頸在於 OCR 辨識出的倒數文字本身只精確到秒,更高精度的照片時間沒有實質意義 |
 | 20 | 測試策略:核心流程手動測試,僅對純函式(時間解析/重生時間計算/排序)寫單元測試 | 完整自動化 E2E 測試金字塔 | 小型個人/朋友圈工具,聚焦在容易壞、壞了難發現的邏輯,不追求高覆蓋率 |
+| 21 | OCR 改用 Cloud Function(Firebase Functions)代打 Google Cloud Vision API,取代決策 #5 的純前端 Tesseract.js | 前端直接夾帶 Vision API 金鑰、繼續用 Tesseract.js 但接受低準確度 | 實測(2026-07-04,用真實截圖對照)Vision API 準確度明顯優於 Tesseract.js,地標名稱與倒數時間都能乾淨辨識;金鑰不能放前端(bundle 可被任何人複製走去打別人的帳單),Cloud Function 用 Application Default Credentials 呼叫 Vision API,完全不需要建立/儲存/輪替任何金鑰,比「金鑰存 Secret Manager」更簡單也更安全。代價:專案需升級 Blaze 方案、多一個 GCP 依賴 |
+| 22 | 用 Firebase App Check(reCAPTCHA v3)保護 Cloud Function,只允許正式前端呼叫 | 不加防護(僅靠 maxInstances + 預算告警)、用 IP 白名單 | IP 白名單在多人協作情境不可行(朋友們的 IP 各自不同且會變動,鎖 IP 等於鎖死所有人)。reCAPTCHA v3 隱形、不影響使用者體驗,免費額度(每月 100 萬次評估)遠超這個規模用量,沒有金錢成本;代價是多一個 Google reCAPTCHA 外部依賴(少數瀏覽器攔截套件可能擋掉)和少量瀏覽器訊號流向 Google |
 
 ## 4. 最終設計
 
@@ -52,14 +54,15 @@
   │    ├─ 首頁:建立新觀察集
   │    ├─ 觀察集頁 /set/:setId
   │    │    ├─ 即時清單 (Firestore onSnapshot 訂閱)
-  │    │    ├─ 批次上傳 + OCR 確認流程 (Tesseract.js,瀏覽器內執行)
+  │    │    ├─ 批次上傳 + OCR 確認流程 (呼叫 Cloud Function 代打 Cloud Vision API)
   │    │    └─ 通知設定面板 (存 localStorage)
   │    └─ 前端計時邏輯:每秒 tick 重新計算剩餘時間、排序、觸發到期通知
-  └─ Firebase Firestore (唯一雲端依賴,無自建後端伺服器/API)
+  ├─ Firebase Firestore (多人即時同步)
+  └─ Firebase Cloud Functions (`ocrRecognize`,用 Application Default Credentials 呼叫 Cloud Vision API,金鑰不落地於前端;用 App Check/reCAPTCHA v3 限制只有正式前端能呼叫)
 ```
 
 - 觀察集用一組短的隨機 ID 當作路由與 Firestore 文件 ID,分享連結格式類似 `https://xxx.web.app/set/AbC123`,連結本身就是存取憑證(無需登入)
-- Tesseract.js 的中文語言包(`chi_tra`)延遲載入,第一次上傳照片時才下載,避免拖慢首頁載入
+- Cloud Functions、Firestore 皆為 Firebase 代管服務,不需要自建/維運伺服器,只是把 OCR 這個需要金鑰的呼叫移到後端執行(對應決策 #21)
 - PWA 只做到「可加到主畫面、離線瀏覽已快取頁面」,不做背景推播
 
 ### 4.2 資料模型(Firestore)
@@ -86,7 +89,7 @@ observationSets (collection)
 
 **批次上傳與 OCR 確認**:
 1. 觀察集頁點「上傳照片」,可一次選多張
-2. 逐張(非同時,避免手機負載過重)跑 Tesseract.js OCR
+2. 逐張(非同時,避免手機負載過重)呼叫 Cloud Function(`ocrRecognize`)代打 Cloud Vision API
 3. 每張處理完立刻顯示確認卡片:原圖縮圖、地標名稱猜測(取畫面上方 1/3 區域最長文字,可編輯)、剩餘時間猜測(用正規表達式比對「剩下(?:X小時)?(?:Y分)?(?:Z秒)?」格式,可編輯)、時間來源標籤
 4. 確認/修正後計算 `respawnAt = 照片時間(lastModified 優先 EXIF,都無則強制手動輸入) + 剩餘時間 + 5 分鐘`
 5. 若 `locationName` 與現有 `counting` 狀態項目重複,提示「更新既有項目」或「新增一筆」
@@ -105,7 +108,7 @@ observationSets (collection)
 
 ### 4.5 錯誤處理與邊界情況
 
-- Tesseract.js 載入失敗:顯示錯誤 + 「重試」按鈕,確認表單仍可手動填寫
+- Cloud Function 呼叫失敗(網路異常/服務暫時無法使用):顯示錯誤提示,確認表單仍可手動填寫
 - OCR 完全辨識不到時間格式:欄位留白標紅提示,必填欄位為空時「加入」按鈕停用
 - Firestore 讀取失敗:顯示連線提示,搭配 SDK 內建離線快取自動同步
 - Firestore 寫入失敗(離線):暫存本機,顯示「等待網路恢復後送出」,不阻塞後續照片處理
