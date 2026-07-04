@@ -72,6 +72,12 @@ describe('guessLocationName', () => {
     )
   })
 
+  // 遊戲畫面的「>」箭頭 UI 元素有時會被 OCR 誤判成地標名稱的一部分,應該要被去掉
+  it('strips a trailing ">" UI arrow icon and surrounding whitespace from the OCR guess', () => {
+    const lines = [{ text: '金色水岸捷運淡水線介紹牌 >', bbox: { y0: 100, y1: 160 } }]
+    expect(guessLocationName(lines, imageHeight)).toBe('金色水岸捷運淡水線介紹牌')
+  })
+
   it('returns empty string when no lines or no image height', () => {
     expect(guessLocationName([], imageHeight)).toBe('')
     expect(guessLocationName(null, imageHeight)).toBe('')

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculateRespawnAt, BUFFER_MS } from '../respawn.js'
+import { calculateRespawnAt, BUFFER_MS, RESPAWN_GRACE_MS } from '../respawn.js'
 
 describe('calculateRespawnAt', () => {
   it('adds duration and fixed 5-minute buffer to photo time', () => {
@@ -15,5 +15,11 @@ describe('calculateRespawnAt', () => {
   it('handles zero duration (already respawned in the photo)', () => {
     const photoTimeMs = 1000
     expect(calculateRespawnAt(photoTimeMs, 0)).toBe(photoTimeMs + BUFFER_MS)
+  })
+})
+
+describe('RESPAWN_GRACE_MS', () => {
+  it('exposes the fixed 5-second post-respawn grace period', () => {
+    expect(RESPAWN_GRACE_MS).toBe(5 * 1000)
   })
 })

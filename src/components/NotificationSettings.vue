@@ -1,15 +1,34 @@
 <script setup>
-import { ref } from 'vue'
-import { getNotifyBeforeSeconds, setNotifyBeforeSeconds } from '../lib/notificationSettings.js'
-import { requestNotificationPermission } from '../composables/useNotifications.js'
+import { ref, computed } from 'vue'
+import {
+  getReminderBeforeSeconds,
+  setReminderBeforeSeconds,
+  getActionBeforeSeconds,
+  setActionBeforeSeconds,
+} from '../lib/notificationSettings.js'
+import {
+  requestNotificationPermission,
+  playReminderSound,
+  playActionSound,
+} from '../composables/useNotifications.js'
 
-const seconds = ref(getNotifyBeforeSeconds())
+const reminderSeconds = ref(getReminderBeforeSeconds())
+const actionSeconds = ref(getActionBeforeSeconds())
 const permission = ref(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
 
-function handleSecondsChange() {
-  const value = Number(seconds.value)
+const isActionAfterReminder = computed(() => Number(actionSeconds.value) >= Number(reminderSeconds.value))
+
+function handleReminderChange() {
+  const value = Number(reminderSeconds.value)
   if (Number.isFinite(value) && value >= 0) {
-    setNotifyBeforeSeconds(value)
+    setReminderBeforeSeconds(value)
+  }
+}
+
+function handleActionChange() {
+  const value = Number(actionSeconds.value)
+  if (Number.isFinite(value) && value >= 0) {
+    setActionBeforeSeconds(value)
   }
 }
 
@@ -24,17 +43,37 @@ async function handleRequestPermission() {
 
 <template>
   <details class="settings">
-    <summary>🔔 通知設定(僅影響這台裝置)</summary>
+    <summary>🔔 通知設定<span class="hint-scope">(僅影響這台裝置)</span></summary>
     <div class="settings-body">
       <label>
-        重生前幾秒提醒:
-        <input v-model.number="seconds" type="number" min="0" @change="handleSecondsChange" />
-        秒
+        <span class="label-text">
+          提醒音
+          <span class="hint">重生前多久播放,提醒即將要操作了</span>
+        </span>
+        <span class="seconds-input">
+          <input v-model.number="reminderSeconds" type="number" min="0" @change="handleReminderChange" />
+          秒
+          <button type="button" class="icon-btn" title="試聽提醒音" @click="playReminderSound">🔊</button>
+        </span>
       </label>
 
+      <label>
+        <span class="label-text">
+          操作音
+          <span class="hint">重生前多久播放,提醒該點開遊戲操作了</span>
+        </span>
+        <span class="seconds-input">
+          <input v-model.number="actionSeconds" type="number" min="0" @change="handleActionChange" />
+          秒
+          <button type="button" class="icon-btn" title="試聽操作音" @click="playActionSound">🔊</button>
+        </span>
+      </label>
+
+      <p v-if="isActionAfterReminder" class="hint warning">⚠️ 操作秒數通常應小於提醒秒數</p>
+
       <div v-if="permission !== 'unsupported'">
-        <p v-if="permission === 'granted'">✅ 已授權瀏覽器通知</p>
-        <button v-else @click="handleRequestPermission">開啟瀏覽器通知授權</button>
+        <p v-if="permission === 'granted'" class="granted">✅ 已授權瀏覽器通知</p>
+        <button v-else type="button" @click="handleRequestPermission">開啟瀏覽器通知授權</button>
       </div>
       <p v-else class="muted">此瀏覽器不支援 Notification API,僅會播放音效。</p>
     </div>
@@ -43,21 +82,122 @@ async function handleRequestPermission() {
 
 <style scoped>
 .settings {
-  margin-bottom: 16px;
-  padding: 10px 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  border: 2px solid var(--border);
+  border-radius: 16px;
   background: var(--card-bg);
+}
+
+.settings summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text-h);
+  list-style: none;
+}
+
+.settings summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--leaf);
+  transition: transform 0.15s ease;
+}
+
+.settings[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.hint-scope {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 0.85em;
+  margin-left: 4px;
 }
 
 .settings-body {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.settings-body label {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  font-weight: 700;
   gap: 10px;
-  margin-top: 10px;
+}
+
+.label-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.label-text .hint {
+  font-weight: 500;
+  font-size: 0.8em;
+  color: var(--muted);
+}
+
+.seconds-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.seconds-input input {
+  width: 60px;
+  padding: 6px 8px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 2px solid var(--border);
+  border-radius: 50%;
+  background: var(--card-bg-soft);
+  font-size: 0.95em;
+  box-shadow: none;
+}
+
+.icon-btn:hover {
+  background: var(--sun-bg);
+}
+
+.icon-btn:active {
+  transform: scale(0.9);
+}
+
+.granted {
+  color: var(--leaf-dark);
+  font-weight: 700;
+  margin: 0;
 }
 
 .muted {
   color: var(--muted);
+  font-weight: 600;
+}
+
+.hint.warning {
+  color: var(--danger);
+  font-weight: 700;
+  margin: -4px 0 0;
 }
 </style>

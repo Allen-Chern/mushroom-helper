@@ -78,28 +78,30 @@ function handleSubmit() {
 
 <template>
   <div class="confirm-card">
-    <img :src="imageUrl" alt="上傳的截圖縮圖" class="thumbnail" />
+    <div class="polaroid">
+      <img :src="imageUrl" alt="上傳的截圖縮圖" class="thumbnail" />
+    </div>
 
     <label>
-      地標名稱
+      🏷️ 地標名稱
       <input v-model="locationName" type="text" placeholder="例如:風景變電箱" />
     </label>
 
     <fieldset class="duration-fields">
-      <legend>剩餘時間</legend>
-      <label>時 <input v-model.number="hours" type="number" min="0" /></label>
-      <label>分 <input v-model.number="minutes" type="number" min="0" max="59" /></label>
-      <label>秒 <input v-model.number="seconds" type="number" min="0" max="59" /></label>
+      <legend>⏳ 剩餘時間</legend>
+      <label class="dial"><input v-model.number="hours" type="number" min="0" /><span>時</span></label>
+      <label class="dial"><input v-model.number="minutes" type="number" min="0" max="59" /><span>分</span></label>
+      <label class="dial"><input v-model.number="seconds" type="number" min="0" max="59" /><span>秒</span></label>
     </fieldset>
 
     <fieldset class="photo-time-fields">
-      <legend>照片時間({{ timeSourceLabel }})</legend>
+      <legend>📸 照片時間({{ timeSourceLabel }})</legend>
       <input
         v-model="photoDateTimeMinutePart"
         type="datetime-local"
         @change="markPhotoTimeAsManual"
       />
-      <label>秒 <input v-model.number="photoSeconds" type="number" min="0" max="59" @change="markPhotoTimeAsManual" /></label>
+      <label class="dial"><input v-model.number="photoSeconds" type="number" min="0" max="59" @change="markPhotoTimeAsManual" /><span>秒</span></label>
     </fieldset>
 
     <p v-if="isRespawnTimeSuspicious" class="warning">
@@ -107,14 +109,14 @@ function handleSubmit() {
     </p>
 
     <div v-if="duplicateMatch" class="duplicate-notice">
-      <p>⚠️ 已有相同地點「{{ duplicateMatch.locationName }}」正在倒數中,要:</p>
-      <label><input v-model="updateMode" type="radio" value="update" /> 更新既有項目</label>
-      <label><input v-model="updateMode" type="radio" value="add" /> 新增一筆</label>
+      <p>🔁 已有相同地點「{{ duplicateMatch.locationName }}」正在倒數中,要:</p>
+      <label class="radio"><input v-model="updateMode" type="radio" value="update" /> 更新既有項目</label>
+      <label class="radio"><input v-model="updateMode" type="radio" value="add" /> 新增一筆</label>
     </div>
 
     <div class="actions">
-      <button type="button" @click="emit('skip')">放棄這張</button>
-      <button type="button" :disabled="!isValid" @click="handleSubmit">加入</button>
+      <button type="button" class="ghost-btn" @click="emit('skip')">放棄這張</button>
+      <button type="button" class="submit-btn" :disabled="!isValid" @click="handleSubmit">🌼 加入</button>
     </div>
   </div>
 </template>
@@ -123,98 +125,146 @@ function handleSubmit() {
 .confirm-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 14px;
-  margin-bottom: 12px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  gap: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+  border: 2px solid var(--border);
+  border-radius: 20px;
   background: var(--card-bg);
+  box-shadow: var(--shadow-pop);
+  animation: popIn 0.35s ease both;
+}
+
+.polaroid {
+  padding: 10px 10px 20px;
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 6px 16px -8px rgba(0, 0, 0, 0.35);
+  transform: rotate(-1.2deg);
+  align-self: center;
+  width: 92%;
 }
 
 .thumbnail {
+  display: block;
   width: 100%;
   max-height: 220px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: 2px;
 }
 
 label {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 0.9em;
+  font-size: 0.92em;
+  font-weight: 700;
   color: var(--muted);
 }
 
 input[type='text'],
 input[type='datetime-local'] {
-  padding: 8px;
+  padding: 9px 10px;
   color: var(--text-h);
-  background: var(--bg);
+  background: var(--card-bg-soft);
+  font-weight: 600;
+}
+
+input[type='text']:focus-visible,
+input[type='datetime-local']:focus-visible {
+  border-color: var(--leaf);
+}
+
+.duration-fields,
+.photo-time-fields {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.duration-fields legend,
+.photo-time-fields legend {
+  font-weight: 700;
+  color: var(--text-h);
+  padding: 0 0 6px;
 }
 
 .duration-fields {
   display: flex;
-  gap: 12px;
-  border: none;
-  padding: 0;
-  margin: 0;
-}
-
-.duration-fields label {
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-}
-
-.duration-fields input {
-  width: 60px;
-  padding: 6px;
+  gap: 10px;
 }
 
 .photo-time-fields {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 12px;
-  border: none;
-  padding: 0;
-  margin: 0;
+  flex-wrap: wrap;
 }
 
-.photo-time-fields label {
-  flex-direction: row;
+.dial {
+  flex-direction: column-reverse;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
-.photo-time-fields input[type='number'] {
-  width: 60px;
-  padding: 6px;
+.dial input {
+  width: 64px;
+  padding: 8px 4px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.05em;
 }
 
 .warning {
   color: var(--danger);
   font-size: 0.9em;
+  font-weight: 700;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--coral-bg);
 }
 
 .duplicate-notice {
-  padding: 10px;
-  border-radius: 8px;
-  background: var(--accent-bg);
-  font-size: 0.9em;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--sun-bg);
+  font-size: 0.92em;
 }
 
-.duplicate-notice label {
+.duplicate-notice p {
+  margin: 0 0 8px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.radio {
   flex-direction: row;
   align-items: center;
   gap: 6px;
   display: inline-flex;
   margin-right: 12px;
+  font-weight: 600;
 }
 
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 10px;
+}
+
+.ghost-btn {
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+  border: 2px solid var(--border);
+}
+
+.ghost-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.submit-btn {
+  background: linear-gradient(180deg, var(--bloom) 0%, var(--bloom-dark) 100%);
+  border-radius: 999px;
 }
 </style>

@@ -1,15 +1,38 @@
 :root {
-  --text: #3a3a3a;
-  --text-h: #1a1a1a;
-  --bg: #fdfaf3;
-  --card-bg: #ffffff;
-  --border: #e5e0d5;
-  --accent: #8a4fd6;
-  --accent-bg: rgba(138, 79, 214, 0.1);
-  --danger: #c0392b;
-  --muted: #8a8a8a;
+  --text: #3c3020;
+  --text-h: #24321f;
+  --sky-top: #bfe8f5;
+  --sky-bottom: #eef8dc;
+  --bg: #eaf6df;
+  --card-bg: #fffdf6;
+  --card-bg-soft: #fcf6e6;
+  --border: #e3d9b8;
 
-  font: 16px/145% system-ui, 'Segoe UI', Roboto, sans-serif;
+  --leaf: #4caf50;
+  --leaf-dark: #2e7d32;
+  --leaf-bg: rgba(76, 175, 80, 0.14);
+  --sun: #ffc93c;
+  --sun-dark: #e0a415;
+  --sun-bg: rgba(255, 201, 60, 0.18);
+  --sky: #3aa8e0;
+  --sky-dark: #1c7ba8;
+  --sky-bg: rgba(58, 168, 224, 0.14);
+  --coral: #ef4b3a;
+  --coral-dark: #c8341f;
+  --coral-bg: rgba(239, 75, 58, 0.14);
+  --bloom: #b96bd6;
+  --bloom-dark: #8d3aad;
+
+  --accent: var(--leaf);
+  --accent-dark: var(--leaf-dark);
+  --accent-bg: var(--leaf-bg);
+  --danger: var(--coral-dark);
+  --muted: #857a5c;
+
+  --shadow-pop: 0 3px 0 rgba(0, 0, 0, 0.12), 0 10px 22px -10px rgba(46, 90, 30, 0.35);
+
+  font: 17px/1.55 'Baloo 2', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+  font-weight: 500;
   color-scheme: light dark;
   color: var(--text);
   background: var(--bg);
@@ -21,15 +44,37 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #cfcfcf;
-    --text-h: #f3f4f6;
-    --bg: #17161c;
-    --card-bg: #201f27;
-    --border: #34323d;
-    --accent: #b98af0;
-    --accent-bg: rgba(185, 138, 240, 0.15);
-    --danger: #e57368;
-    --muted: #8f8d99;
+    --text: #e4e0cf;
+    --text-h: #f4f2e6;
+    --sky-top: #131c2e;
+    --sky-bottom: #1c2c1e;
+    --bg: #16201a;
+    --card-bg: #21301f;
+    --card-bg-soft: #263524;
+    --border: #35462f;
+
+    --leaf: #6cc96f;
+    --leaf-dark: #9be79d;
+    --leaf-bg: rgba(108, 201, 111, 0.16);
+    --sun: #ffd166;
+    --sun-dark: #ffdd8a;
+    --sun-bg: rgba(255, 209, 102, 0.14);
+    --sky: #5fbdec;
+    --sky-dark: #8fd3f5;
+    --sky-bg: rgba(95, 189, 236, 0.16);
+    --coral: #ff7a68;
+    --coral-dark: #ffa599;
+    --coral-bg: rgba(255, 122, 104, 0.16);
+    --bloom: #d18ce8;
+    --bloom-dark: #e6b8f5;
+
+    --accent: var(--leaf);
+    --accent-dark: var(--leaf-dark);
+    --accent-bg: var(--leaf-bg);
+    --danger: var(--coral-dark);
+    --muted: #a3ac97;
+
+    --shadow-pop: 0 3px 0 rgba(0, 0, 0, 0.35), 0 12px 26px -10px rgba(0, 0, 0, 0.55);
   }
 }
 
@@ -39,30 +84,139 @@
 
 body {
   margin: 0;
+  min-height: 100svh;
+  background:
+    radial-gradient(ellipse 60% 40% at 15% 8%, color-mix(in srgb, var(--sun) 45%, transparent), transparent),
+    radial-gradient(ellipse 50% 35% at 90% 0%, color-mix(in srgb, var(--sky) 35%, transparent), transparent),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bottom) 42%, var(--bg) 70%);
+  background-attachment: fixed;
+  position: relative;
+  overflow-x: hidden;
+}
+
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* soft floating leaf/pollen dots drifting across the garden sky */
+body::before {
+  background-image:
+    radial-gradient(circle, color-mix(in srgb, var(--leaf) 55%, transparent) 3px, transparent 4px),
+    radial-gradient(circle, color-mix(in srgb, var(--sun) 60%, transparent) 3px, transparent 4px),
+    radial-gradient(circle, color-mix(in srgb, var(--sky) 50%, transparent) 3px, transparent 4px);
+  background-size: 220px 260px, 300px 340px, 260px 300px;
+  background-position: 10% 20%, 70% 60%, 40% 85%;
+  animation: driftDots 26s ease-in-out infinite alternate;
+  opacity: 0.6;
+}
+
+@keyframes driftDots {
+  from {
+    transform: translate(0, 0);
+  }
+  to {
+    transform: translate(-16px, 22px);
+  }
 }
 
 h1,
 h2,
 h3 {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-h);
+  margin: 0 0 12px;
+  letter-spacing: 0.01em;
+}
+
+p {
   margin: 0 0 12px;
 }
 
 button {
   font: inherit;
+  font-weight: 700;
   cursor: pointer;
 }
 
 input,
 button {
-  border-radius: 6px;
-  border: 1px solid var(--border);
+  border-radius: 12px;
+  border: 2px solid var(--border);
+}
+
+button:not(.icon-btn):not(.delete-btn) {
+  padding: 10px 18px;
+  color: #fff;
+  background: var(--leaf);
+  border: none;
+  box-shadow: var(--shadow-pop);
+  transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+button:not(.icon-btn):not(.delete-btn):hover:not(:disabled) {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+}
+
+button:not(.icon-btn):not(.delete-btn):active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12), 0 4px 10px -6px rgba(46, 90, 30, 0.35);
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(0.3);
+}
+
+input {
+  background: var(--card-bg);
+  color: var(--text-h);
+  font: inherit;
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--sky) 60%, transparent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--sun);
+  color: #2b2410;
 }
 
 #app {
+  position: relative;
+  z-index: 1;
   max-width: 640px;
   margin: 0 auto;
   min-height: 100svh;
-  padding: 16px;
+  padding: 20px 16px 48px;
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(2deg);
+  }
 }

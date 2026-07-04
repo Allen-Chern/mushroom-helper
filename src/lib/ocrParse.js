@@ -21,6 +21,15 @@ export function guessDurationText(fullText) {
 const TOP_REGION_RATIO = 0.2
 const CLOCK_PATTERN = /^\d{1,2}[:.]\d{2}/
 
+// 遊戲畫面某些地標名稱後面會多一個「>」箭頭 UI 元素被 OCR 誤判成文字內容
+// (例如「金色水岸捷運淡水線介紹牌 >」),屬於畫面固定元素而非地標名稱本身,
+// 只去除字串「尾端」由空白/> 組成的那一段,不影響 > 出現在字串中間、或結尾非 > 字元的情況
+const TRAILING_ARROW_PATTERN = /[\s>]+$/
+
+function stripTrailingArrow(text) {
+  return text.replace(TRAILING_ARROW_PATTERN, '')
+}
+
 function countCjkChars(text) {
   return (text.match(/[一-鿿]/g) ?? []).length
 }
@@ -40,7 +49,7 @@ export function guessLocationName(lines, imageHeight) {
   const topRegion = imageHeight * TOP_REGION_RATIO
   const candidates = lines
     .filter((line) => line.bbox && line.bbox.y1 <= topRegion)
-    .map((line) => line.text.trim())
+    .map((line) => stripTrailingArrow(line.text.trim()))
     .filter((text) => text.length >= 2 && !CLOCK_PATTERN.test(text) && contentScore(text) > 0)
 
   if (candidates.length === 0) return ''

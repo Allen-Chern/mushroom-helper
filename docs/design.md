@@ -43,6 +43,9 @@
 | 20 | 測試策略:核心流程手動測試,僅對純函式(時間解析/重生時間計算/排序)寫單元測試 | 完整自動化 E2E 測試金字塔 | 小型個人/朋友圈工具,聚焦在容易壞、壞了難發現的邏輯,不追求高覆蓋率 |
 | 21 | OCR 改用 Cloud Function(Firebase Functions)代打 Google Cloud Vision API,取代決策 #5 的純前端 Tesseract.js | 前端直接夾帶 Vision API 金鑰、繼續用 Tesseract.js 但接受低準確度 | 實測(2026-07-04,用真實截圖對照)Vision API 準確度明顯優於 Tesseract.js,地標名稱與倒數時間都能乾淨辨識;金鑰不能放前端(bundle 可被任何人複製走去打別人的帳單),Cloud Function 用 Application Default Credentials 呼叫 Vision API,完全不需要建立/儲存/輪替任何金鑰,比「金鑰存 Secret Manager」更簡單也更安全。代價:專案需升級 Blaze 方案、多一個 GCP 依賴 |
 | 22 | 用 Firebase App Check(reCAPTCHA v3)保護 Cloud Function,只允許正式前端呼叫 | 不加防護(僅靠 maxInstances + 預算告警)、用 IP 白名單 | IP 白名單在多人協作情境不可行(朋友們的 IP 各自不同且會變動,鎖 IP 等於鎖死所有人)。reCAPTCHA v3 隱形、不影響使用者體驗,免費額度(每月 100 萬次評估)遠超這個規模用量,沒有金錢成本;代價是多一個 Google reCAPTCHA 外部依賴(少數瀏覽器攔截套件可能擋掉)和少量瀏覽器訊號流向 Google |
+| 23 | 通知設定卡片加「🔊 試聽」按鈕,直接播放提醒/操作音效 | 不提供試聽,靠實際等待驗證 | 使用者原回饋現有音效太不明顯,試聽讓調整設定時能立即確認效果 |
+| 24 | 通知拆分成「提醒(reminder)」與「操作(action)」兩組獨立門檻與音效,取代原本單一 `notifyBeforeSeconds` | 維持單一門檻,只加長/加大音量 | 使用者需求明確區分「快到了準備」與「現在就要操作」兩種不同急迫程度,需要不同秒數與音色才能光靠聽覺分辨;沿用舊 storage key 給提醒設定,既有使用者偏好不會被重置。操作秒數大於等於提醒秒數時只顯示警告文字,不強制阻擋 |
+| 25 | 到期轉換新增固定 5 秒緩衝(`RESPAWN_GRACE_MS`)才寫入 `awaiting_confirmation` | 維持瞬間轉換 | 讓操作音效與 GO 視覺動畫有實際可視、可操作的時間,避免畫面瞬間跳走 |
 
 ## 4. 最終設計
 
@@ -102,9 +105,15 @@ observationSets (collection)
 
 - 全域 `setInterval` 每秒觸發,重新計算所有 `counting` 項目的 `remainingMs`
 - 排序:`counting` 依 `remainingMs` 由小到大排最前;`awaiting_confirmation` 排最後,依 `respawnAt` 新到舊排
-- 到期轉換:`remainingMs <= 0` 時前端把該文件 `status` 更新為 `awaiting_confirmation`(多人同時寫入同樣的值無害)
-- 通知觸發:每次 tick 檢查 `remainingMs` 是否「跨過」使用者設定的提醒秒數(預設 20 秒),觸發後在前端記憶體標記「已通知過」(不同步到 Firestore),播放音效 + 若已授權則同時發 Notification
-- 每個裝置依自己的 localStorage 設定獨立判斷是否要響,同一份倒數資料不同人可設定不同提醒時間點
+- 到期轉換:`remainingMs <= 0` 後,額外等待固定 5 秒緩衝(`RESPAWN_GRACE_MS`,對應決策 #25)才把該文件
+  `status` 更新為 `awaiting_confirmation`(多人同時寫入同樣的值無害);這段緩衝期讓卡片上的「GO」動畫
+  有實際顯示時間,而不是重生瞬間就跳去「已重生/待確認」畫面
+- 通知觸發:拆分成「提醒」與「操作」兩組獨立門檻(對應決策 #24)
+  - 提醒(預設重生前 20 秒):跨過門檻時播放較柔和、重複的提醒音效(約 3 秒),卡片同時疊加暖黃光暈脈動動畫
+  - 操作(預設重生前 3 秒):跨過門檻時播放較急促、音高更高的操作音效(約 3 秒),卡片倒數文字改用
+    圓環倒數(依門檻秒數遞減),歸零瞬間顯示「GO」動畫,直到上述 5 秒緩衝結束才轉為「已重生/待確認」
+  - 兩者都在前端記憶體標記「已通知過」(不同步到 Firestore),若已授權瀏覽器通知則同時各自發一則 Notification
+- 每個裝置依自己的 localStorage 設定獨立判斷是否要響,同一份倒數資料不同人可設定不同提醒/操作時間點
 
 ### 4.5 錯誤處理與邊界情況
 
