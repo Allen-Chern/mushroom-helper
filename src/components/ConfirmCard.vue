@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { calculateRespawnAt } from '../lib/respawn.js'
+import { findDuplicateItem } from '../lib/duplicate.js'
 
 const props = defineProps({
   imageUrl: { type: String, required: true },
@@ -52,13 +53,11 @@ const durationMs = computed(() => {
 
 const respawnAt = computed(() => calculateRespawnAt(photoTimeMs.value, durationMs.value))
 
-const duplicateMatch = computed(() => {
-  const name = locationName.value.trim()
-  if (!name) return null
-  return (
-    props.existingItems.find((item) => item.status === 'counting' && item.locationName.trim() === name) ||
-    null
-  )
+const duplicateMatch = computed(() => findDuplicateItem(props.existingItems, locationName.value))
+
+const duplicateStateLabel = computed(() => {
+  if (!duplicateMatch.value) return ''
+  return duplicateMatch.value.status === 'awaiting_confirmation' ? '已重生待確認' : '正在倒數中'
 })
 
 const isRespawnTimeSuspicious = computed(() => respawnAt.value < Date.now() - 60 * 60 * 1000)
@@ -109,7 +108,7 @@ function handleSubmit() {
     </p>
 
     <div v-if="duplicateMatch" class="duplicate-notice">
-      <p>🔁 已有相同地點「{{ duplicateMatch.locationName }}」正在倒數中,要:</p>
+      <p>🔁 已有相同地點「{{ duplicateMatch.locationName }}」({{ duplicateStateLabel }}),要:</p>
       <label class="radio"><input v-model="updateMode" type="radio" value="update" /> 更新既有項目</label>
       <label class="radio"><input v-model="updateMode" type="radio" value="add" /> 新增一筆</label>
     </div>

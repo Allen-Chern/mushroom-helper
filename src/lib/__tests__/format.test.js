@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatRemaining } from '../format.js'
+import { formatRemaining, formatClockTime } from '../format.js'
 
 describe('formatRemaining', () => {
   it('formats hours, minutes, seconds with zero padding', () => {
@@ -12,5 +12,29 @@ describe('formatRemaining', () => {
 
   it('clamps negative remaining time to zero', () => {
     expect(formatRemaining(-5000)).toBe('00:00:00')
+  })
+})
+
+describe('formatClockTime', () => {
+  const at = (y, mo, d, h, mi) => new Date(y, mo - 1, d, h, mi).getTime()
+
+  it('shows HH:MM for the same day', () => {
+    expect(formatClockTime(at(2026, 7, 6, 14, 32), at(2026, 7, 6, 10, 0))).toBe('14:32')
+  })
+
+  it('pads hours and minutes', () => {
+    expect(formatClockTime(at(2026, 7, 6, 8, 5), at(2026, 7, 6, 7, 0))).toBe('08:05')
+  })
+
+  it('marks tomorrow explicitly', () => {
+    expect(formatClockTime(at(2026, 7, 7, 0, 15), at(2026, 7, 6, 23, 50))).toBe('明天 00:15')
+  })
+
+  it('marks yesterday explicitly', () => {
+    expect(formatClockTime(at(2026, 7, 5, 22, 0), at(2026, 7, 6, 1, 0))).toBe('昨天 22:00')
+  })
+
+  it('falls back to month/day for farther dates', () => {
+    expect(formatClockTime(at(2026, 7, 9, 9, 30), at(2026, 7, 6, 10, 0))).toBe('7/9 09:30')
   })
 })

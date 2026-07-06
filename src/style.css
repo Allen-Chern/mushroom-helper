@@ -86,41 +86,29 @@ body {
   margin: 0;
   min-height: 100svh;
   background:
-    radial-gradient(ellipse 60% 40% at 15% 8%, color-mix(in srgb, var(--sun) 45%, transparent), transparent),
-    radial-gradient(ellipse 50% 35% at 90% 0%, color-mix(in srgb, var(--sky) 35%, transparent), transparent),
-    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bottom) 42%, var(--bg) 70%);
+    radial-gradient(ellipse 55% 38% at 14% 6%, color-mix(in srgb, var(--sun) 40%, transparent), transparent),
+    radial-gradient(ellipse 45% 32% at 92% 0%, color-mix(in srgb, var(--sky) 30%, transparent), transparent),
+    radial-gradient(ellipse 70% 30% at 50% 100%, color-mix(in srgb, var(--leaf) 16%, transparent), transparent),
+    linear-gradient(180deg, var(--sky-top) 0%, var(--sky-bottom) 46%, var(--bg) 74%);
   background-attachment: fixed;
   position: relative;
   overflow-x: hidden;
 }
 
-body::before,
+/* 細緻的紙感噪點:非常低的透明度疊在整個畫面上,消除純漸層的塑膠感 */
 body::after {
   content: '';
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity: 0.045;
 }
 
-/* soft floating leaf/pollen dots drifting across the garden sky */
-body::before {
-  background-image:
-    radial-gradient(circle, color-mix(in srgb, var(--leaf) 55%, transparent) 3px, transparent 4px),
-    radial-gradient(circle, color-mix(in srgb, var(--sun) 60%, transparent) 3px, transparent 4px),
-    radial-gradient(circle, color-mix(in srgb, var(--sky) 50%, transparent) 3px, transparent 4px);
-  background-size: 220px 260px, 300px 340px, 260px 300px;
-  background-position: 10% 20%, 70% 60%, 40% 85%;
-  animation: driftDots 26s ease-in-out infinite alternate;
-  opacity: 0.6;
-}
-
-@keyframes driftDots {
-  from {
-    transform: translate(0, 0);
-  }
-  to {
-    transform: translate(-16px, 22px);
+@media (prefers-color-scheme: dark) {
+  body::after {
+    opacity: 0.07;
   }
 }
 

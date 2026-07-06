@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue'
-import { formatRemaining } from '../lib/format.js'
+import { formatRemaining, formatClockTime } from '../lib/format.js'
 import { getReminderBeforeSeconds, getActionBeforeSeconds } from '../lib/notificationSettings.js'
 
 const props = defineProps({
@@ -33,6 +33,9 @@ const phase = computed(() => {
   return 'idle'
 })
 
+// 除了倒數,同時標出實際的重生時刻(幾點幾分),玩家可以直接對照手錶安排行程
+const respawnClock = computed(() => formatClockTime(props.item.respawnAt, props.now))
+
 // 圓環中心顯示的秒數,與 phase==='action' 共用同一組操作門檻,兩者是同一段時間窗
 const actionRemainingSeconds = computed(() => Math.max(1, Math.ceil(remainingMs.value / 1000)))
 const actionProgress = computed(() => {
@@ -52,16 +55,22 @@ const actionProgress = computed(() => {
       <strong class="location-name">{{ item.locationName || '(未命名地點)' }}</strong>
       <span v-if="isAwaitingConfirmation" class="badge">
         <span class="bloom-icon" aria-hidden="true">🌸</span> 已重生 / 待確認
+        <span class="respawn-clock">{{ respawnClock }}</span>
       </span>
       <div
         v-else-if="phase === 'action' || phase === 'go'"
-        class="action-ring"
-        :style="{ '--progress': phase === 'go' ? 1 : actionProgress }"
+        class="time-row"
       >
-        <span v-if="phase === 'go'" class="ring-label go-label">GO</span>
-        <span v-else :key="actionRemainingSeconds" class="ring-label">{{ actionRemainingSeconds }}</span>
+        <div class="action-ring" :style="{ '--progress': phase === 'go' ? 1 : actionProgress }">
+          <span v-if="phase === 'go'" class="ring-label go-label">GO</span>
+          <span v-else :key="actionRemainingSeconds" class="ring-label">{{ actionRemainingSeconds }}</span>
+        </div>
+        <span class="respawn-clock">{{ respawnClock }} 重生</span>
       </div>
-      <span v-else class="countdown">{{ formatRemaining(remainingMs) }}</span>
+      <div v-else class="time-row">
+        <span class="countdown">{{ formatRemaining(remainingMs) }}</span>
+        <span class="respawn-clock">{{ respawnClock }} 重生</span>
+      </div>
     </div>
     <button class="delete-btn" title="刪除" @click="emit('delete', item.id)">✕</button>
   </li>
@@ -162,11 +171,35 @@ const actionProgress = computed(() => {
   white-space: nowrap;
 }
 
+.time-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .countdown {
   font-variant-numeric: tabular-nums;
   font-size: 1.3em;
   font-weight: 700;
   letter-spacing: 0.02em;
+}
+
+/* 實際重生時刻(幾點幾分):做成小葉片標籤陪在倒數旁邊,弱化但可讀 */
+.respawn-clock {
+  font-size: 0.8em;
+  font-weight: 700;
+  color: var(--muted);
+  background: var(--card-bg-soft);
+  border: 1.5px solid var(--border);
+  border-radius: 999px 999px 999px 4px;
+  padding: 2px 10px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.badge .respawn-clock {
+  align-self: center;
 }
 
 .urgency-leaf .countdown {

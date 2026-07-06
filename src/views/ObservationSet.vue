@@ -21,6 +21,10 @@ const { now } = useCountdownTick()
 useNotifications(items, now)
 
 const sortedItems = computed(() => sortItems(items.value, now.value))
+const countingCount = computed(() => items.value.filter((i) => i.status === 'counting').length)
+const awaitingCount = computed(
+  () => items.value.filter((i) => i.status === 'awaiting_confirmation').length,
+)
 
 onMounted(() => {
   unsubscribe = subscribeToItems(props.setId, (list) => {
@@ -72,7 +76,20 @@ async function handleDelete(itemId) {
 <template>
   <main class="observation-set">
     <header class="set-header">
-      <h1><span aria-hidden="true">🍄</span> 觀察集</h1>
+      <div class="set-title">
+        <span class="title-badge" aria-hidden="true">🍄</span>
+        <div class="title-text">
+          <h1>觀察集</h1>
+          <p class="title-sub">
+            <template v-if="items.length > 0">
+              🌱 {{ countingCount }} 個倒數中<template v-if="awaitingCount > 0">
+                · 🌸 {{ awaitingCount }} 個待採</template
+              >
+            </template>
+            <template v-else>邀請隊友一起記錄這片森林</template>
+          </p>
+        </div>
+      </div>
       <button class="share-btn" type="button" @click="handleCopyLink">
         {{ isLinkCopied ? '✅ 已複製連結' : '🔗 複製分享連結' }}
       </button>
@@ -110,12 +127,53 @@ async function handleDelete(itemId) {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 18px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px dashed color-mix(in srgb, var(--leaf) 45%, var(--border));
+}
+
+.set-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* 蘑菇徽章:圓形葉綠底、白邊、微傾斜,像插在花園裡的木牌招牌 */
+.title-badge {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  font-size: 1.7rem;
+  border-radius: 50% 50% 50% 12%;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--leaf) 40%, var(--card-bg)) 0%, var(--leaf-bg) 100%);
+  border: 3px solid var(--card-bg);
+  box-shadow: var(--shadow-pop);
+  transform: rotate(-6deg);
+  animation: bob 4.5s ease-in-out infinite;
+}
+
+.title-text {
+  min-width: 0;
 }
 
 .set-header h1 {
   margin: 0;
-  font-size: 1.6rem;
+  font-size: 1.55rem;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+}
+
+.title-sub {
+  margin: 2px 0 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .share-btn {
@@ -124,6 +182,13 @@ async function handleDelete(itemId) {
   font-size: 0.9rem;
   padding: 10px 16px;
   white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), var(--shadow-pop);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-badge {
+    animation: none;
+  }
 }
 
 .item-list {

@@ -1,9 +1,12 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { recognizeImage, getImageDimensions } from '../lib/ocr.js'
 import { guessDurationText, guessLocationName } from '../lib/ocrParse.js'
 import { readExifDateTime } from '../lib/exif.js'
 import { getClientId } from '../lib/clientId.js'
+import { calculateRespawnAt } from '../lib/respawn.js'
+import { findDuplicateItem } from '../lib/duplicate.js'
+import { formatClockTime } from '../lib/format.js'
 import { addItem, updateItem } from '../services/observationSets.js'
 import ConfirmCard from './ConfirmCard.vue'
 
@@ -12,18 +15,32 @@ const props = defineProps({
   existingItems: { type: Array, default: () => [] },
 })
 
+const AUTO_MODE_STORAGE_KEY = 'mushroom-helper:auto-mode'
+
+const autoMode = ref(localStorage.getItem(AUTO_MODE_STORAGE_KEY) === '1')
+watch(autoMode, (value) => localStorage.setItem(AUTO_MODE_STORAGE_KEY, value ? '1' : '0'))
+
 const queue = ref([])
 const currentIndex = ref(0)
 const currentGuess = ref(null)
 const currentImageUrl = ref('')
 const isProcessing = ref(false)
+const isAutoResolving = ref(false)
 const isSaving = ref(false)
 const ocrError = ref('')
 const saveError = ref('')
 const completedCount = ref(0)
+const autoLog = ref([])
+
+// 同一批次內剛存好的項目(名稱→itemId):Firestore snapshot 回寫有延遲,
+// 批次裡連續兩張同地點截圖若只靠 existingItems 比對會漏掉,導致重複新增
+let sessionSavedIds = new Map()
 
 const isActive = computed(() => queue.value.length > 0 && currentIndex.value < queue.value.length)
 const isFinished = computed(() => queue.value.length > 0 && currentIndex.value >= queue.value.length)
+const showConfirmCard = computed(
+  () => currentGuess.value && !isProcessing.value && !isAutoResolving.value,
+)
 
 async function resolvePhotoTime(file) {
   const exifMs = await readExifDateTime(file)
@@ -39,8 +56,28 @@ async function handleFilesSelected(event) {
   currentIndex.value = 0
   completedCount.value = 0
   saveError.value = ''
-  await processCurrent()
+  autoLog.value = []
+  sessionSavedIds = new Map()
+  await processQueueStep()
   event.target.value = ''
+}
+
+// 每張截圖的處理入口:先 OCR,自動模式下嘗試直接存檔並連續處理下一張;
+// 辨識不完整或存檔失敗就退回手動確認卡,由使用者接手
+async function processQueueStep() {
+  const useAuto = autoMode.value
+  if (useAuto) isAutoResolving.value = true
+  try {
+    await processCurrent()
+    if (!useAuto || !currentGuess.value) return
+    const saved = await tryAutoSave()
+    if (saved) {
+      advanceCleanup()
+      if (currentIndex.value < queue.value.length) await processQueueStep()
+    }
+  } finally {
+    if (useAuto) isAutoResolving.value = false
+  }
 }
 
 async function processCurrent() {
@@ -93,14 +130,86 @@ async function processCurrent() {
   }
 }
 
-function advanceToNext() {
+// 自動模式的存檔判斷:地標名稱與剩餘時間都辨識到、算出的重生時間不可疑才放行,
+// 任一條件不滿足就回傳 false 落回手動確認
+async function tryAutoSave() {
+  const guess = currentGuess.value
+  const name = (guess.locationName ?? '').trim()
+  const durationMs =
+    ((Number(guess.hours) * 60 + Number(guess.minutes)) * 60 + Number(guess.seconds)) * 1000
+
+  if (!name || durationMs <= 0) {
+    ocrError.value = '⚡ 自動模式:辨識結果不完整,改由手動確認這張。'
+    return false
+  }
+
+  const respawnAt = calculateRespawnAt(guess.photoTimeMs, durationMs)
+  if (respawnAt < Date.now() - 60 * 60 * 1000) {
+    ocrError.value = '⚡ 自動模式:算出的重生時間比現在早超過 1 小時,請手動確認。'
+    return false
+  }
+
+  const duplicateId =
+    sessionSavedIds.get(name) ?? findDuplicateItem(props.existingItems, name)?.id ?? null
+
+  isSaving.value = true
+  try {
+    await saveObservation({
+      locationName: name,
+      respawnAt,
+      photoTimeSource: guess.photoTimeSource,
+      itemId: duplicateId,
+    })
+    autoLog.value.push({
+      name,
+      action: duplicateId ? 'updated' : 'added',
+      clock: formatClockTime(respawnAt),
+    })
+    return true
+  } catch (err) {
+    console.error(err)
+    saveError.value = '⚡ 自動儲存失敗,請檢查網路後改用下方卡片手動加入。'
+    return false
+  } finally {
+    isSaving.value = false
+  }
+}
+
+async function saveObservation({ locationName, respawnAt, photoTimeSource, itemId }) {
+  if (itemId) {
+    await updateItem(props.setId, itemId, {
+      locationName,
+      respawnAt,
+      photoTimeSource,
+      status: 'counting',
+    })
+    sessionSavedIds.set(locationName, itemId)
+  } else {
+    const newId = await addItem(props.setId, {
+      locationName,
+      respawnAt,
+      photoTimeSource,
+      status: 'counting',
+      updatedBy: getClientId(),
+    })
+    sessionSavedIds.set(locationName, newId)
+  }
+  completedCount.value += 1
+}
+
+function advanceCleanup() {
   if (currentImageUrl.value) URL.revokeObjectURL(currentImageUrl.value)
   currentImageUrl.value = ''
   currentGuess.value = null
   saveError.value = ''
+  ocrError.value = ''
   currentIndex.value += 1
+}
+
+async function advanceToNext() {
+  advanceCleanup()
   if (currentIndex.value < queue.value.length) {
-    processCurrent()
+    await processQueueStep()
   }
 }
 
@@ -108,24 +217,13 @@ async function handleSubmit(payload) {
   isSaving.value = true
   saveError.value = ''
   try {
-    if (payload.duplicateItemId) {
-      await updateItem(props.setId, payload.duplicateItemId, {
-        locationName: payload.locationName,
-        respawnAt: payload.respawnAt,
-        photoTimeSource: payload.photoTimeSource,
-        status: 'counting',
-      })
-    } else {
-      await addItem(props.setId, {
-        locationName: payload.locationName,
-        respawnAt: payload.respawnAt,
-        photoTimeSource: payload.photoTimeSource,
-        status: 'counting',
-        updatedBy: getClientId(),
-      })
-    }
-    completedCount.value += 1
-    advanceToNext()
+    await saveObservation({
+      locationName: payload.locationName,
+      respawnAt: payload.respawnAt,
+      photoTimeSource: payload.photoTimeSource,
+      itemId: payload.duplicateItemId,
+    })
+    await advanceToNext()
   } catch (err) {
     console.error(err)
     saveError.value = '儲存失敗,請檢查網路後再按一次「加入」。'
@@ -143,6 +241,7 @@ function handleReset() {
   currentIndex.value = 0
   currentGuess.value = null
   completedCount.value = 0
+  autoLog.value = []
 }
 </script>
 
@@ -154,14 +253,34 @@ function handleReset() {
       <input type="file" accept="image/*" multiple :disabled="isActive" @change="handleFilesSelected" />
     </label>
 
+    <label class="auto-toggle">
+      <input v-model="autoMode" type="checkbox" />
+      <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+      <span class="toggle-text">
+        <strong>⚡ 自動模式</strong>
+        <small>辨識成功就直接新增/更新地標,免逐張確認</small>
+      </span>
+    </label>
+
     <p v-if="isActive" class="progress">🐛 處理中:第 {{ currentIndex + 1 }} / {{ queue.length }} 張</p>
 
     <p v-if="isProcessing" class="hint">🔍 OCR 辨識中,請稍候...</p>
+    <p v-else-if="isAutoResolving" class="hint">⚡ 自動判斷中...</p>
     <p v-if="ocrError" class="hint warning">⚠️ {{ ocrError }}</p>
     <p v-if="saveError" class="hint warning">⚠️ {{ saveError }}</p>
 
+    <ul v-if="autoLog.length > 0" class="auto-log">
+      <li v-for="(entry, index) in autoLog" :key="index">
+        <span class="log-action" :class="`log-${entry.action}`">
+          {{ entry.action === 'updated' ? '更新' : '新增' }}
+        </span>
+        <span class="log-name">{{ entry.name }}</span>
+        <span class="log-clock">{{ entry.clock }} 重生</span>
+      </li>
+    </ul>
+
     <ConfirmCard
-      v-if="currentGuess && !isProcessing"
+      v-if="showConfirmCard"
       :key="currentIndex"
       :image-url="currentImageUrl"
       :guess="currentGuess"
@@ -220,6 +339,75 @@ function handleReset() {
   cursor: pointer;
 }
 
+.auto-toggle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--card-bg-soft);
+  border: 2px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.auto-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggle-track {
+  flex-shrink: 0;
+  width: 46px;
+  height: 26px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 35%, transparent);
+  padding: 3px;
+  transition: background 0.2s ease;
+}
+
+.toggle-thumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.auto-toggle input:checked + .toggle-track {
+  background: linear-gradient(180deg, var(--sun) 0%, var(--sun-dark) 100%);
+}
+
+.auto-toggle input:checked + .toggle-track .toggle-thumb {
+  transform: translateX(20px);
+}
+
+.auto-toggle input:focus-visible + .toggle-track {
+  outline: 3px solid color-mix(in srgb, var(--sky) 60%, transparent);
+  outline-offset: 2px;
+}
+
+.toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.toggle-text strong {
+  color: var(--text-h);
+  font-size: 0.95em;
+}
+
+.toggle-text small {
+  color: var(--muted);
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
 .progress {
   margin: 10px 0 0;
   color: var(--muted);
@@ -234,6 +422,59 @@ function handleReset() {
 
 .hint.warning {
   color: var(--danger);
+}
+
+.auto-log {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--card-bg-soft);
+  border: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9em;
+}
+
+.auto-log li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  animation: popIn 0.3s ease both;
+}
+
+.log-action {
+  flex-shrink: 0;
+  font-size: 0.82em;
+  font-weight: 700;
+  padding: 1px 8px;
+  border-radius: 999px;
+  color: #fff;
+}
+
+.log-added {
+  background: var(--leaf);
+}
+
+.log-updated {
+  background: var(--sky);
+}
+
+.log-name {
+  font-weight: 700;
+  color: var(--text-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.log-clock {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .done {
