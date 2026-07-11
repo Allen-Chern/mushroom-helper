@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { recognizeImage, getImageDimensions } from '../lib/ocr.js'
 import { guessDurationText, guessLocationName } from '../lib/ocrParse.js'
 import { readExifDateTime } from '../lib/exif.js'
@@ -8,6 +8,7 @@ import { calculateRespawnAt } from '../lib/respawn.js'
 import { findDuplicateItem } from '../lib/duplicate.js'
 import { formatClockTime } from '../lib/format.js'
 import { addItem, updateItem } from '../services/observationSets.js'
+import { autoMode } from '../lib/autoMode.js'
 import ConfirmCard from './ConfirmCard.vue'
 
 const props = defineProps({
@@ -15,11 +16,7 @@ const props = defineProps({
   existingItems: { type: Array, default: () => [] },
 })
 
-const AUTO_MODE_STORAGE_KEY = 'mushroom-helper:auto-mode'
-
-const autoMode = ref(localStorage.getItem(AUTO_MODE_STORAGE_KEY) === '1')
-watch(autoMode, (value) => localStorage.setItem(AUTO_MODE_STORAGE_KEY, value ? '1' : '0'))
-
+const fileInput = ref(null)
 const queue = ref([])
 const currentIndex = ref(0)
 const currentGuess = ref(null)
@@ -38,6 +35,14 @@ let sessionSavedIds = new Map()
 
 const isActive = computed(() => queue.value.length > 0 && currentIndex.value < queue.value.length)
 const isFinished = computed(() => queue.value.length > 0 && currentIndex.value >= queue.value.length)
+
+// 上傳入口改為 header 的圓形 icon 按鈕(位於 ObservationSet),
+// 由父層透過 template ref 呼叫 openPicker 觸發隱藏的檔案選擇器
+function openPicker() {
+  if (!isActive.value) fileInput.value?.click()
+}
+
+defineExpose({ openPicker, isActive })
 const showConfirmCard = computed(
   () => currentGuess.value && !isProcessing.value && !isAutoResolving.value,
 )
@@ -247,20 +252,14 @@ function handleReset() {
 
 <template>
   <section class="upload-flow">
-    <label class="file-picker" :class="{ 'is-disabled': isActive }">
-      <span class="picker-icon" aria-hidden="true">🌱</span>
-      <span class="picker-text">上傳截圖(可多選)</span>
-      <input type="file" accept="image/*" multiple :disabled="isActive" @change="handleFilesSelected" />
-    </label>
-
-    <label class="auto-toggle">
-      <input v-model="autoMode" type="checkbox" />
-      <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
-      <span class="toggle-text">
-        <strong>⚡ 自動模式</strong>
-        <small>辨識成功就直接新增/更新地標,免逐張確認</small>
-      </span>
-    </label>
+    <input
+      ref="fileInput"
+      class="hidden-input"
+      type="file"
+      accept="image/*"
+      multiple
+      @change="handleFilesSelected"
+    />
 
     <p v-if="isActive" class="progress">🐛 處理中:第 {{ currentIndex + 1 }} / {{ queue.length }} 張</p>
 
@@ -298,114 +297,10 @@ function handleReset() {
 </template>
 
 <style scoped>
-.upload-flow {
-  margin-bottom: 18px;
-}
-
-.file-picker {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 16px 18px;
-  border: 3px dashed color-mix(in srgb, var(--leaf) 55%, var(--border));
-  border-radius: 18px;
-  background: var(--leaf-bg);
-  cursor: pointer;
-  font-weight: 700;
-  color: var(--leaf-dark);
-  transition: transform 0.15s ease, background 0.15s ease;
-}
-
-.file-picker:hover {
-  background: color-mix(in srgb, var(--leaf) 18%, transparent);
-  transform: translateY(-1px);
-}
-
-.file-picker.is-disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-.picker-icon {
-  font-size: 1.4rem;
-  animation: bob 3s ease-in-out infinite;
-}
-
-.file-picker input[type='file'] {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.auto-toggle {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 10px;
-  padding: 10px 14px;
-  border-radius: 14px;
-  background: var(--card-bg-soft);
-  border: 2px solid var(--border);
-  cursor: pointer;
-  user-select: none;
-}
-
-.auto-toggle input {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.toggle-track {
-  flex-shrink: 0;
-  width: 46px;
-  height: 26px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--muted) 35%, transparent);
-  padding: 3px;
-  transition: background 0.2s ease;
-}
-
-.toggle-thumb {
-  display: block;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.auto-toggle input:checked + .toggle-track {
-  background: linear-gradient(180deg, var(--sun) 0%, var(--sun-dark) 100%);
-}
-
-.auto-toggle input:checked + .toggle-track .toggle-thumb {
-  transform: translateX(20px);
-}
-
-.auto-toggle input:focus-visible + .toggle-track {
-  outline: 3px solid color-mix(in srgb, var(--sky) 60%, transparent);
-  outline-offset: 2px;
-}
-
-.toggle-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.toggle-text strong {
-  color: var(--text-h);
-  font-size: 0.95em;
-}
-
-.toggle-text small {
-  color: var(--muted);
-  font-size: 0.8em;
-  font-weight: 600;
+/* 入口按鈕移到 header 後,這個區塊平常只剩隱藏的 input,不佔空間;
+   有處理進度/確認卡時由子元素自己的 margin 撐開間距 */
+.hidden-input {
+  display: none;
 }
 
 .progress {

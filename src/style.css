@@ -33,7 +33,7 @@
 
   font: 17px/1.55 'Baloo 2', 'Noto Sans TC', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
   font-weight: 500;
-  color-scheme: light dark;
+  color-scheme: light;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -42,40 +42,41 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #e4e0cf;
-    --text-h: #f4f2e6;
-    --sky-top: #131c2e;
-    --sky-bottom: #1c2c1e;
-    --bg: #16201a;
-    --card-bg: #21301f;
-    --card-bg-soft: #263524;
-    --border: #35462f;
+/* 深色模式改由 <html data-theme> 驅動(theme.js),預設仍跟隨系統,
+   使用者在設定 Modal 選過淺/深後以使用者選擇為準 */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --text: #e4e0cf;
+  --text-h: #f4f2e6;
+  --sky-top: #131c2e;
+  --sky-bottom: #1c2c1e;
+  --bg: #16201a;
+  --card-bg: #21301f;
+  --card-bg-soft: #263524;
+  --border: #35462f;
 
-    --leaf: #6cc96f;
-    --leaf-dark: #9be79d;
-    --leaf-bg: rgba(108, 201, 111, 0.16);
-    --sun: #ffd166;
-    --sun-dark: #ffdd8a;
-    --sun-bg: rgba(255, 209, 102, 0.14);
-    --sky: #5fbdec;
-    --sky-dark: #8fd3f5;
-    --sky-bg: rgba(95, 189, 236, 0.16);
-    --coral: #ff7a68;
-    --coral-dark: #ffa599;
-    --coral-bg: rgba(255, 122, 104, 0.16);
-    --bloom: #d18ce8;
-    --bloom-dark: #e6b8f5;
+  --leaf: #6cc96f;
+  --leaf-dark: #9be79d;
+  --leaf-bg: rgba(108, 201, 111, 0.16);
+  --sun: #ffd166;
+  --sun-dark: #ffdd8a;
+  --sun-bg: rgba(255, 209, 102, 0.14);
+  --sky: #5fbdec;
+  --sky-dark: #8fd3f5;
+  --sky-bg: rgba(95, 189, 236, 0.16);
+  --coral: #ff7a68;
+  --coral-dark: #ffa599;
+  --coral-bg: rgba(255, 122, 104, 0.16);
+  --bloom: #d18ce8;
+  --bloom-dark: #e6b8f5;
 
-    --accent: var(--leaf);
-    --accent-dark: var(--leaf-dark);
-    --accent-bg: var(--leaf-bg);
-    --danger: var(--coral-dark);
-    --muted: #a3ac97;
+  --accent: var(--leaf);
+  --accent-dark: var(--leaf-dark);
+  --accent-bg: var(--leaf-bg);
+  --danger: var(--coral-dark);
+  --muted: #a3ac97;
 
-    --shadow-pop: 0 3px 0 rgba(0, 0, 0, 0.35), 0 12px 26px -10px rgba(0, 0, 0, 0.55);
-  }
+  --shadow-pop: 0 3px 0 rgba(0, 0, 0, 0.35), 0 12px 26px -10px rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -106,10 +107,8 @@ body::after {
   opacity: 0.045;
 }
 
-@media (prefers-color-scheme: dark) {
-  body::after {
-    opacity: 0.07;
-  }
+:root[data-theme='dark'] body::after {
+  opacity: 0.07;
 }
 
 h1,

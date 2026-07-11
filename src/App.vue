@@ -192,24 +192,22 @@ const spores = [
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  .cloud {
-    background: color-mix(in srgb, #cfe4ff 40%, transparent);
-    opacity: 0.1;
-  }
+:root[data-theme='dark'] .cloud {
+  background: color-mix(in srgb, #cfe4ff 40%, transparent);
+  opacity: 0.1;
+}
 
-  .cloud-b {
-    opacity: 0.07;
-  }
+:root[data-theme='dark'] .cloud-b {
+  opacity: 0.07;
+}
 
-  /* 深色模式下孢子亮度提高、光暈加強,讀起來像螢火蟲 */
-  .spore {
-    box-shadow: 0 0 12px 2px color-mix(in srgb, var(--spore-color) 70%, transparent);
-  }
+/* 深色模式下孢子亮度提高、光暈加強,讀起來像螢火蟲 */
+:root[data-theme='dark'] .spore {
+  box-shadow: 0 0 12px 2px color-mix(in srgb, var(--spore-color) 70%, transparent);
+}
 
-  .ground-sprout {
-    opacity: 0.4;
-  }
+:root[data-theme='dark'] .ground-sprout {
+  opacity: 0.4;
 }
 
 @media (prefers-reduced-motion: reduce) {

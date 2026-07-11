@@ -42,91 +42,51 @@ async function handleRequestPermission() {
 </script>
 
 <template>
-  <details class="settings">
-    <summary>🔔 通知設定<span class="hint-scope">(僅影響這台裝置)</span></summary>
-    <div class="settings-body">
-      <label>
-        <span class="label-text">
-          提醒音
-          <span class="hint">重生前多久播放,提醒即將要操作了</span>
-        </span>
-        <span class="seconds-input">
-          <input v-model.number="reminderSeconds" type="number" min="0" @change="handleReminderChange" />
-          秒
-          <button type="button" class="icon-btn" title="試聽提醒音" @click="playReminderSound">🔊</button>
-        </span>
-      </label>
+  <div class="notification-fields">
+    <label>
+      <span class="label-text">
+        提醒音
+        <span class="hint">重生前多久播放,提醒即將要操作了</span>
+      </span>
+      <span class="seconds-input">
+        <input v-model.number="reminderSeconds" type="number" min="0" @change="handleReminderChange" />
+        秒
+        <button type="button" class="icon-btn" title="試聽提醒音" @click="playReminderSound">🔊</button>
+      </span>
+    </label>
 
-      <label>
-        <span class="label-text">
-          操作音
-          <span class="hint">重生前多久播放,提醒該點開遊戲操作了</span>
-        </span>
-        <span class="seconds-input">
-          <input v-model.number="actionSeconds" type="number" min="0" @change="handleActionChange" />
-          秒
-          <button type="button" class="icon-btn" title="試聽操作音" @click="playActionSound">🔊</button>
-        </span>
-      </label>
+    <label>
+      <span class="label-text">
+        操作音
+        <span class="hint">重生前多久播放,提醒該點開遊戲操作了</span>
+      </span>
+      <span class="seconds-input">
+        <input v-model.number="actionSeconds" type="number" min="0" @change="handleActionChange" />
+        秒
+        <button type="button" class="icon-btn" title="試聽操作音" @click="playActionSound">🔊</button>
+      </span>
+    </label>
 
-      <p v-if="isActionAfterReminder" class="hint warning">⚠️ 操作秒數通常應小於提醒秒數</p>
+    <p v-if="isActionAfterReminder" class="hint warning">⚠️ 操作秒數通常應小於提醒秒數</p>
 
-      <div v-if="permission !== 'unsupported'">
-        <p v-if="permission === 'granted'" class="granted">✅ 已授權瀏覽器通知</p>
-        <button v-else type="button" @click="handleRequestPermission">開啟瀏覽器通知授權</button>
-      </div>
-      <p v-else class="muted">此瀏覽器不支援 Notification API,僅會播放音效。</p>
+    <div v-if="permission !== 'unsupported'">
+      <p v-if="permission === 'granted'" class="granted">✅ 已授權瀏覽器通知</p>
+      <button v-else type="button" class="permission-btn" @click="handleRequestPermission">
+        開啟瀏覽器通知授權
+      </button>
     </div>
-  </details>
+    <p v-else class="muted">此瀏覽器不支援 Notification API,僅會播放音效。</p>
+  </div>
 </template>
 
 <style scoped>
-.settings {
-  margin-bottom: 18px;
-  padding: 12px 16px;
-  border: 2px solid var(--border);
-  border-radius: 16px;
-  background: var(--card-bg);
-}
-
-.settings summary {
-  cursor: pointer;
-  font-weight: 700;
-  color: var(--text-h);
-  list-style: none;
-}
-
-.settings summary::-webkit-details-marker {
-  display: none;
-}
-
-.settings summary::before {
-  content: '▸';
-  display: inline-block;
-  margin-right: 6px;
-  color: var(--leaf);
-  transition: transform 0.15s ease;
-}
-
-.settings[open] summary::before {
-  transform: rotate(90deg);
-}
-
-.hint-scope {
-  color: var(--muted);
-  font-weight: 500;
-  font-size: 0.85em;
-  margin-left: 4px;
-}
-
-.settings-body {
+.notification-fields {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-top: 12px;
 }
 
-.settings-body label {
+.notification-fields label {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -184,6 +144,11 @@ async function handleRequestPermission() {
   transform: scale(0.9);
 }
 
+.permission-btn {
+  align-self: flex-start;
+  font-size: 0.9em;
+}
+
 .granted {
   color: var(--leaf-dark);
   font-weight: 700;
@@ -193,6 +158,7 @@ async function handleRequestPermission() {
 .muted {
   color: var(--muted);
   font-weight: 600;
+  margin: 0;
 }
 
 .hint.warning {
