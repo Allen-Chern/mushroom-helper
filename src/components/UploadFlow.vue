@@ -4,7 +4,7 @@ import { recognizeImage, getImageDimensions } from '../lib/ocr.js'
 import { guessDurationText, guessLocationName } from '../lib/ocrParse.js'
 import { readExifDateTime } from '../lib/exif.js'
 import { getClientId } from '../lib/clientId.js'
-import { calculateRespawnAt } from '../lib/respawn.js'
+import { calculateRespawnAt, RESPAWN_GRACE_MS } from '../lib/respawn.js'
 import { findDuplicateItem } from '../lib/duplicate.js'
 import { formatClockTime } from '../lib/format.js'
 import { addItem, updateItem } from '../services/observationSets.js'
@@ -180,13 +180,17 @@ async function tryAutoSave() {
   }
 }
 
+// 上傳的截圖可能是舊照片(例如手機休眠期間才被處理),算出來的 respawnAt 早已超過
+// RESPAWN_GRACE_MS 緩衝——這種情況直接寫 awaiting_confirmation,
+// 避免其他正在看這筆項目的裝置被迫閃過一次沒有意義的 counting/GO 畫面。
 async function saveObservation({ locationName, respawnAt, photoTimeSource, itemId }) {
+  const status = respawnAt + RESPAWN_GRACE_MS <= Date.now() ? 'awaiting_confirmation' : 'counting'
   if (itemId) {
     await updateItem(props.setId, itemId, {
       locationName,
       respawnAt,
       photoTimeSource,
-      status: 'counting',
+      status,
     })
     sessionSavedIds.set(locationName, itemId)
   } else {
@@ -194,7 +198,7 @@ async function saveObservation({ locationName, respawnAt, photoTimeSource, itemI
       locationName,
       respawnAt,
       photoTimeSource,
-      status: 'counting',
+      status,
       updatedBy: getClientId(),
     })
     sessionSavedIds.set(locationName, newId)
